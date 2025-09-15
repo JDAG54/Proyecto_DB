@@ -1,0 +1,1218 @@
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import com.toedter.calendar.JDateChooser;
+import java.awt.*;
+import java.sql.*;
+import java.util.Date;
+
+public class LoginScreen extends JFrame {
+    private JTextField userField;
+    private String user;
+    private String password;
+    private JPasswordField passField;
+    private JButton loginButton;
+    private JLabel statusLabel;
+
+    public LoginScreen() {
+        setTitle("Trilogia - Inicio de Sesión");
+        setSize(400, 300);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+        setResizable(false);
+
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(Color.LIGHT_GRAY);
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+
+        JLabel titleLabel = new JLabel("Trilogia", SwingConstants.CENTER);
+        titleLabel.setFont(new Font("Serif", Font.BOLD, 24));
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 2;
+        panel.add(titleLabel, gbc);
+
+        JLabel loginLabel = new JLabel("Iniciar sesión", SwingConstants.CENTER);
+        loginLabel.setFont(new Font("SansSerif", Font.PLAIN, 16));
+        gbc.gridy = 1;
+        panel.add(loginLabel, gbc);
+
+        gbc.gridwidth = 1; gbc.gridx = 0; gbc.gridy = 2;
+        panel.add(new JLabel("Usuario:"), gbc);
+
+        gbc.gridx = 1;
+        userField = new JTextField(15);
+        panel.add(userField, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 3;
+        panel.add(new JLabel("Contraseña:"), gbc);
+
+        gbc.gridx = 1;
+        passField = new JPasswordField(15);
+        panel.add(passField, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
+        loginButton = new JButton("Iniciar sesión");
+        panel.add(loginButton, gbc);
+
+        statusLabel = new JLabel("", SwingConstants.CENTER);
+        statusLabel.setForeground(Color.RED);
+        gbc.gridy = 5;
+        panel.add(statusLabel, gbc);
+
+        add(panel, BorderLayout.CENTER);
+
+        loginButton.addActionListener(e -> validateLogin());
+    }
+
+    private void validateLogin() {
+        String user = userField.getText();
+        String password = new String(passField.getPassword());
+
+        if (user.isEmpty() || password.isEmpty()) {
+            statusLabel.setText("Complete todos los campos.");
+            return;
+        }
+
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password)) {
+            this.user = user;
+            this.password = password;
+            JOptionPane.showMessageDialog(this, "Bienvenido, " + user);
+            openMainMenu(this.user, this.password);
+            dispose();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            statusLabel.setText("Usuario o contraseña incorrectos.");
+        }
+    }
+
+    private void openMainMenu(String user, String password) {
+        MainMenuScreen mainMenu = new MainMenuScreen(user, password);
+        mainMenu.setVisible(true);
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new LoginScreen().setVisible(true));
+    }
+}
+
+// --------------------------------------------------------
+
+class MainMenuScreen extends JFrame {
+    private JPanel contentPanel;
+    private String user;
+    private String password;
+
+    private JTable tablePedidos;
+    private DefaultTableModel pedidosModel;
+
+    public MainMenuScreen(String user, String password) {
+        this.user = user;
+        this.password = password;
+
+        setTitle("Trilogia - Menú Principal");
+        setSize(800, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+
+        JPanel sideMenu = new JPanel(new GridLayout(4, 1, 5, 5));
+
+        JButton profileButton = new JButton("Perfil");
+        JButton reservationsButton = new JButton("Reservas");
+        JButton billsButton = new JButton("Facturas");
+        JButton ordersButton = new JButton("Pedidos");
+
+        sideMenu.add(profileButton);
+        sideMenu.add(reservationsButton);
+        sideMenu.add(billsButton);
+        sideMenu.add(ordersButton);
+
+        add(sideMenu, BorderLayout.WEST);
+
+        contentPanel = new JPanel(new BorderLayout());
+        add(contentPanel, BorderLayout.CENTER);
+
+        profileButton.addActionListener(e -> showProfileScreen());
+        reservationsButton.addActionListener(e -> showReservationScreen());
+        ordersButton.addActionListener(e -> showOrdersScreen());
+        billsButton.addActionListener(e -> showBillsScreen());
+    }
+
+    private void showProfileScreen() {
+        contentPanel.removeAll();
+        contentPanel.add(new ProfileScreen(user, password));
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+
+    private void showReservationScreen() {
+        contentPanel.removeAll();
+        contentPanel.add(new ReservationScreen(user, password));
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+
+    private void showOrdersScreen() {
+        contentPanel.removeAll();
+
+        JPanel ordersPanel = new JPanel(new GridBagLayout());
+
+        JButton realizarPedidoButton = new JButton("Realizar Pedido");
+        JButton verPedidosButton = new JButton("Ver Pedidos");
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.gridy = 0;
+
+        gbc.gridx = 0;
+        ordersPanel.add(realizarPedidoButton, gbc);
+
+        gbc.gridx = 1;
+        ordersPanel.add(verPedidosButton, gbc);
+
+        contentPanel.add(ordersPanel, BorderLayout.CENTER);
+
+        realizarPedidoButton.addActionListener(e -> realizarPedido());
+        verPedidosButton.addActionListener(e -> mostrarTablaPedidos());
+
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+
+    private void realizarPedido() {
+        contentPanel.removeAll();
+
+        JPanel realizarPedidoPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+
+        // Campo para capturar idCliente
+        JLabel lblIdCliente = new JLabel("ID Cliente:");
+        JTextField txtIdCliente = new JTextField(10);
+        JButton buscarClienteButton = new JButton("Buscar Cliente");
+
+        // Botón para regresar
+        JButton regresarButton = new JButton("Regresar");
+
+        // Posicionamiento
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        realizarPedidoPanel.add(lblIdCliente, gbc);
+
+        gbc.gridx = 1;
+        realizarPedidoPanel.add(txtIdCliente, gbc);
+
+        gbc.gridx = 2;
+        realizarPedidoPanel.add(buscarClienteButton, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        gbc.gridwidth = 3;
+        realizarPedidoPanel.add(regresarButton, gbc);
+
+        // Lógica del botón Buscar Cliente
+        buscarClienteButton.addActionListener(e -> {
+            String idClienteText = txtIdCliente.getText().trim();
+            if (idClienteText.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Por favor ingrese un ID de Cliente.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            if (idClienteText.length() < 7) {
+                JOptionPane.showMessageDialog(this, "Longitud de ID no valida.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            try {
+                int idCliente = Integer.parseInt(idClienteText);
+                int resultado = existeCliente(idCliente);
+
+                if (resultado == -1) {
+                    JOptionPane.showMessageDialog(this, "Ocurrió un error al verificar el cliente. Por favor, intente de nuevo.", "Error", JOptionPane.ERROR_MESSAGE);
+                    return; // No continuamos si hay error real.
+                }
+
+                if (resultado == 0) {
+                    int confirm = JOptionPane.showConfirmDialog(this, "Cliente no encontrado. ¿Desea registrarlo ahora?", "Información", JOptionPane.YES_NO_OPTION);
+                    if (confirm == JOptionPane.YES_OPTION) {
+                        RegistroClienteScreen registro = new RegistroClienteScreen(this, user, password, idCliente);
+                        registro.setVisible(true);
+
+                        // Revalidamos si ahora ya existe
+                        if (existeCliente(idCliente) == 1) {
+                            JOptionPane.showMessageDialog(this, "Cliente registrado correctamente. Continúa con el pedido.", "Información", JOptionPane.INFORMATION_MESSAGE);
+                            iniciarFlujoCrearPedido(idCliente);
+                        }
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(this, "Cliente encontrado correctamente.", "Información", JOptionPane.INFORMATION_MESSAGE);
+                    iniciarFlujoCrearPedido(idCliente);
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "El ID Cliente debe ser un número válido.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        // Lógica del botón Regresar
+        regresarButton.addActionListener(e -> showOrdersScreen());
+
+        contentPanel.setLayout(new BorderLayout());
+        contentPanel.add(realizarPedidoPanel, BorderLayout.CENTER);
+
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+
+    private void iniciarFlujoCrearPedido(int idCliente) {
+        MesaDialog mesaDialog = new MesaDialog(this);
+        mesaDialog.setVisible(true);
+
+        if (!mesaDialog.isConfirmado()) {
+            JOptionPane.showMessageDialog(this, "Pedido cancelado.", "Información", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        int numeroMesa = mesaDialog.getNumeroMesa();
+        crearPedidoEnBD(this, numeroMesa, idCliente);
+    }
+
+    private boolean crearPedidoEnBD(MainMenuScreen mainMenuScreen, int mesa, int idCliente) {
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{CALL sp_insertar_pedido_mes(?, ?, ?)}")) {
+
+            stmt.setInt(1, mesa);
+            stmt.setInt(2, idCliente);
+            stmt.setString(3, password);
+            stmt.execute();
+            JOptionPane.showMessageDialog(mainMenuScreen, "Pedido creado correctamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+
+            return true;
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(mainMenuScreen, "Error al crear el pedido. " + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+    }
+
+    // Función auxiliar para validar si existe un cliente
+    private int existeCliente(int idCliente) {
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{? = CALL existeCliente(?)}")) {
+
+            stmt.registerOutParameter(1, Types.INTEGER);
+            stmt.setInt(2, idCliente);
+            stmt.execute();
+
+            return stmt.getInt(1); // Devuelve 0 o 1, sin mensajes.
+
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            return -1; // Devuelve un código especial si hay error.
+        }
+    }
+
+    private void mostrarTablaPedidos() {
+        contentPanel.removeAll();
+
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        JButton regresarButton = new JButton("Regresar");
+        JButton cambiarEstadoButton = new JButton("Cambiar Estado");
+        JButton borrarPedidoButton = new JButton("Borrar Pedido");
+        JButton actualizarPedidoButton = new JButton("Actualizar Pedido");
+        JButton verPedidoButton = new JButton("Ver Pedido");  // Nuevo botón
+
+        cambiarEstadoButton.setEnabled(false);
+        borrarPedidoButton.setEnabled(false);
+        actualizarPedidoButton.setEnabled(false);
+        verPedidoButton.setEnabled(false);  // Inicialmente deshabilitado
+
+        topPanel.add(regresarButton);
+        topPanel.add(cambiarEstadoButton);
+        topPanel.add(borrarPedidoButton);
+        topPanel.add(actualizarPedidoButton);
+        topPanel.add(verPedidoButton);  // Se agrega el nuevo botón
+
+        crearTablaPedidos();
+
+        tablePedidos.getSelectionModel().addListSelectionListener(e -> {
+            boolean seleccionado = tablePedidos.getSelectedRow() != -1;
+            cambiarEstadoButton.setEnabled(seleccionado);
+            borrarPedidoButton.setEnabled(seleccionado);
+            actualizarPedidoButton.setEnabled(seleccionado);
+            verPedidoButton.setEnabled(seleccionado);  // Habilitar solo si hay selección
+        });
+
+        regresarButton.addActionListener(e -> showOrdersScreen());
+        cambiarEstadoButton.addActionListener(e -> cambiarEstadoPedido());
+        borrarPedidoButton.addActionListener(e -> borrarPedido());
+        actualizarPedidoButton.addActionListener(e -> actualizarPedido());
+        verPedidoButton.addActionListener(e -> verPedido());  // Llama al método verPedido()
+
+        contentPanel.setLayout(new BorderLayout());
+        contentPanel.add(topPanel, BorderLayout.NORTH);
+        contentPanel.add(new JScrollPane(tablePedidos), BorderLayout.CENTER);
+
+        cargarPedidos();
+
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+
+    private void crearTablaPedidos() {
+        pedidosModel = new DefaultTableModel(new String[]{"Número de Mesa"}, 0);
+        tablePedidos = new JTable(pedidosModel);
+        tablePedidos.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+    }
+
+    private void cargarPedidos() {
+        pedidosModel.setRowCount(0);
+
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{CALL sp_ver_mesas_pedido()}")) {
+
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                pedidosModel.addRow(new Object[]{rs.getInt("ped_num_mesa")});
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error al cargar pedidos: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void verPedido() {
+        int selectedRow = tablePedidos.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Selecciona una mesa primero.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int mesa = (int) pedidosModel.getValueAt(selectedRow, 0);
+        int idPedido = buscarIdPedidoActivo(mesa);
+
+        if (idPedido == -1) {
+            JOptionPane.showMessageDialog(this, "No se encontró un pedido activo para esa mesa.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        new DetallePedidoScreen(this, user, password, idPedido);
+    }
+    private void cambiarEstadoPedido() {
+        int selectedRow = tablePedidos.getSelectedRow();
+        if (selectedRow == -1) return;
+
+        int mesa = (int) pedidosModel.getValueAt(selectedRow, 0);
+
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "¿Seguro que deseas cambiar el estado del pedido de la mesa " + mesa + "?",
+                "Confirmar Cambio de Estado",
+                JOptionPane.YES_NO_OPTION
+        );
+
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{CALL sp_cambiar_estado(?)}")) {
+
+            stmt.setInt(1, mesa);
+            stmt.execute();
+
+            JOptionPane.showMessageDialog(this, "Estado cambiado correctamente.");
+            cargarPedidos();
+
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error al cambiar estado: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void borrarPedido() {
+        int selectedRow = tablePedidos.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Selecciona un pedido primero.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int mesa = (int) pedidosModel.getValueAt(selectedRow, 0);
+
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "¿Seguro que deseas borrar el pedido de la mesa " + mesa + "?",
+                "Confirmar",
+                JOptionPane.YES_NO_OPTION
+        );
+
+        if (confirm != JOptionPane.YES_OPTION) {
+            return; // Si elige "No", no hacemos nada
+        }
+
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{CALL sp_borrar_pedido(?)}")) {
+
+            stmt.setInt(1, mesa);
+            stmt.execute();
+
+            JOptionPane.showMessageDialog(this, "Pedido borrado correctamente.");
+
+            // Recargar la tabla para reflejar el cambio
+            cargarPedidos();
+
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error al borrar el pedido: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void actualizarPedido() {
+        int selectedRow = tablePedidos.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Selecciona un pedido primero.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int mesa = Integer.parseInt(pedidosModel.getValueAt(selectedRow, 0).toString());
+
+        int idPedido = buscarIdPedidoActivo(mesa);
+
+        if (idPedido == -1) {
+            JOptionPane.showMessageDialog(this, "No se encontró un pedido activo para esa mesa.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        new ActualizarPedidoScreen(this, user, password, idPedido);
+    }
+
+    private int buscarIdPedidoActivo(int mesa) {
+        int idPedido = -1;
+
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{? = CALL fn_buscar_id_pedido_activo(?)}")) {
+
+            stmt.registerOutParameter(1, Types.INTEGER);
+            stmt.setInt(2, mesa);
+            stmt.execute();
+
+            idPedido = stmt.getInt(1);
+
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error al buscar el ID del pedido: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+
+        return idPedido;
+    }
+
+    private void showBillsScreen() {
+        contentPanel.removeAll();
+        contentPanel.add(new BillsScreen(user, password));
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+}
+
+// --------------------------------------------------------
+
+class ProfileScreen extends JPanel {
+    private JLabel nameLabel, idLabel, ageLabel, genderLabel, phoneLabel;
+
+    public ProfileScreen(String user, String password) {
+        setLayout(new GridLayout(6, 1));
+
+        nameLabel = new JLabel("Nombre: ");
+        idLabel = new JLabel("Cédula: ");
+        ageLabel = new JLabel("Edad: ");
+        genderLabel = new JLabel("Sexo: ");
+        phoneLabel = new JLabel("Teléfono: ");
+        JButton paymentHistoryButton = new JButton("Historial de pagos");
+
+        add(nameLabel);
+        add(idLabel);
+        add(ageLabel);
+        add(genderLabel);
+        add(phoneLabel);
+        add(paymentHistoryButton);
+
+        paymentHistoryButton.addActionListener(e -> new PaymentHistoryScreen(user, password).setVisible(true));
+
+        loadEmployeeData(user, password);
+    }
+
+    private void loadEmployeeData(String user, String password) {
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{CALL sp_ver_perfil(?)}")) {
+            stmt.setString(1, password);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                nameLabel.setText("Nombre: " + rs.getString("emp_nombre"));
+                idLabel.setText("Cédula: " + rs.getString("emp_id"));
+                ageLabel.setText("Edad: " + rs.getInt("emp_edad"));
+                genderLabel.setText("Sexo: " + rs.getString("emp_sexo"));
+                phoneLabel.setText("Teléfono: " + rs.getString("emp_telefono"));
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+    }
+}
+
+// --------------------------------------------------------
+
+class PaymentHistoryScreen extends JFrame {
+    private JTable table;
+    private DefaultTableModel tableModel;
+
+    public PaymentHistoryScreen(String user, String password) {
+        setTitle("Historial de Pagos");
+        setSize(600, 400);
+        setLocationRelativeTo(null);
+        setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+
+        tableModel = new DefaultTableModel(new String[]{"ID Pago", "ID Empleado", "Fecha Pago", "Monto", "Estado Pago", "Método Pago"}, 0);
+        table = new JTable(tableModel);
+        loadPaymentData(user, password);
+
+        add(new JScrollPane(table), BorderLayout.CENTER);
+    }
+
+    private void loadPaymentData(String user, String password) {
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{CALL sp_ver_pago(?)}")) {
+            stmt.setString(1, password);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                tableModel.addRow(new Object[]{
+                        rs.getInt("pag_id"), rs.getInt("pag_emp_id"), rs.getDate("pag_fecha"),
+                        rs.getDouble("pag_salario"), rs.getString("pag_estado"), rs.getString("pag_metodo")
+                });
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+    }
+}
+
+// --------------------------------------------------------
+
+class ReservationScreen extends JPanel {
+    private JDateChooser dateChooser = new JDateChooser();
+    private JTable table;
+    private DefaultTableModel tableModel;
+    private String user;
+    private String password;
+
+    public ReservationScreen(String user, String password) {
+        this.user = user;
+        this.password = password;
+
+        setLayout(new BorderLayout());
+
+        // Panel superior con selector de fecha y botón
+        JPanel topPanel = new JPanel(new FlowLayout());
+        topPanel.add(new JLabel("Seleccionar Fecha:"));
+        topPanel.add(dateChooser);
+
+        JButton loadButton = new JButton("Cargar Reservas");
+        topPanel.add(loadButton);
+
+        add(topPanel, BorderLayout.NORTH);
+
+        // Tabla para mostrar resultados - con las columnas correctas
+        tableModel = new DefaultTableModel(new String[]{"Cliente", "Personas", "Descripción", "Fecha"}, 0);
+        table = new JTable(tableModel);
+        add(new JScrollPane(table), BorderLayout.CENTER);
+
+        // Acción al presionar "Cargar Reservas"
+        loadButton.addActionListener(e -> loadReservationsByDate());
+    }
+
+    private void loadReservationsByDate() {
+        Date selectedDate = dateChooser.getDate();
+        if (selectedDate == null) {
+            JOptionPane.showMessageDialog(this, "Por favor selecciona una fecha.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        // Convertir fecha a formato yyyy-MM-dd (compatible con MySQL)
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
+        String formattedDate = sdf.format(selectedDate);
+
+        // Limpiar tabla antes de cargar datos nuevos
+        tableModel.setRowCount(0);
+
+        // Conexión y ejecución de procedimiento almacenado
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{CALL sp_ver_reservas_dia(?)}")) {
+
+            stmt.setString(1, formattedDate);
+
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                tableModel.addRow(new Object[]{
+                        rs.getString("Cliente"),   // Cliente
+                        rs.getInt("Personas"),    // Personas
+                        rs.getString("Descripcion"), // Descripción
+                        rs.getDate("Fecha")       // Fecha
+                });
+            }
+
+            if (tableModel.getRowCount() == 0) {
+                JOptionPane.showMessageDialog(this, "No hay reservas para esta fecha.", "Información", JOptionPane.INFORMATION_MESSAGE);
+            }
+
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error al consultar reservas.\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+}
+
+// --------------------------------------------------------
+
+class BillsScreen extends JPanel {
+    private JTable table;
+    private DefaultTableModel tableModel;
+    private String user;
+    private String password;
+
+    public BillsScreen(String user, String password) {
+        this.user = user;
+        this.password = password;
+
+        setLayout(new BorderLayout());
+
+        tableModel = new DefaultTableModel(new String[]{"Mesero", "Mesa", "Pedido", "Fecha", "Propina"}, 0);
+        table = new JTable(tableModel);
+        add(new JScrollPane(table), BorderLayout.CENTER);
+
+        cargarFacturas();
+    }
+
+    private void cargarFacturas() {
+        tableModel.setRowCount(0);  // Limpiar tabla antes de cargar
+
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{CALL sp_ver_factura(?)}")) {
+
+            stmt.setString(1, password);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                tableModel.addRow(new Object[]{
+                        rs.getString("Mesero"),
+                        rs.getInt("Mesa"),
+                        rs.getString("Pedido"),
+                        rs.getDate("Fecha"),
+                        rs.getDouble("Propina")
+                });
+            }
+
+            if (tableModel.getRowCount() == 0) {
+                JOptionPane.showMessageDialog(this, "No hay facturas disponibles.", "Información", JOptionPane.INFORMATION_MESSAGE);
+            }
+
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error al cargar las facturas.\n" + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+}
+
+// --------------------------------------------------------
+
+class ActualizarPedidoScreen extends JDialog {
+
+    private String user;
+    private String password;
+    private int idPedido;
+
+    private JTable tableMenu;
+    private DefaultTableModel menuModel;
+
+    private JTextField txtCantidad;
+    private JButton btnAgregar;
+
+    public ActualizarPedidoScreen(JFrame parent, String user, String password, int idPedido) {
+        super(parent, "Actualizar Pedido - Mesa", true);
+        this.user = user;
+        this.password = password;
+        this.idPedido = idPedido;
+
+        setSize(600, 400);
+        setLocationRelativeTo(parent);
+
+        setLayout(new BorderLayout());
+
+        // Panel superior con tabla del menú
+        menuModel = new DefaultTableModel(new String[]{"ID", "Producto", "Descripción", "Precio"}, 0);
+        tableMenu = new JTable(menuModel) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false; // Deshabilitar edición
+            }
+        };
+        tableMenu.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        cargarMenu();
+
+        add(new JScrollPane(tableMenu), BorderLayout.CENTER);
+
+        // Panel inferior con cantidad y botón de agregar
+        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+
+        bottomPanel.add(new JLabel("Cantidad:"));
+        txtCantidad = new JTextField(5);
+        bottomPanel.add(txtCantidad);
+
+        btnAgregar = new JButton("Agregar Producto");
+        btnAgregar.setEnabled(false);
+        bottomPanel.add(btnAgregar);
+
+        add(bottomPanel, BorderLayout.SOUTH);
+
+        tableMenu.getSelectionModel().addListSelectionListener(e -> {
+            btnAgregar.setEnabled(tableMenu.getSelectedRow() != -1);
+        });
+
+        btnAgregar.addActionListener(e -> agregarProducto());
+
+        setVisible(true);
+    }
+
+    private void cargarMenu() {
+        menuModel.setRowCount(0);
+
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{CALL sp_ver_menu()}")) {
+
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                menuModel.addRow(new Object[]{
+                        rs.getInt("ID"),
+                        rs.getString("Producto"),
+                        rs.getString("Descripcion"),
+                        rs.getDouble("Precio")
+                });
+            }
+
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error al cargar menú: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void agregarProducto() {
+        int selectedRow = tableMenu.getSelectedRow();
+        if (selectedRow == -1) return;
+
+        int productoID = (int) menuModel.getValueAt(selectedRow, 0);
+        String cantidadStr = txtCantidad.getText().trim();
+
+        if (cantidadStr.isEmpty() || !cantidadStr.matches("\\d+")) {
+            JOptionPane.showMessageDialog(this, "Ingresa una cantidad válida.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int cantidad = Integer.parseInt(cantidadStr);
+
+        if (insertarDetallePedido(idPedido, productoID, cantidad)) {
+            JOptionPane.showMessageDialog(this, "Producto agregado correctamente al pedido.");
+            txtCantidad.setText("");  // Limpia la cantidad para el siguiente producto
+            tableMenu.clearSelection();
+            btnAgregar.setEnabled(false);
+        } else {
+            JOptionPane.showMessageDialog(this, "Error al agregar el producto.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private boolean insertarDetallePedido(int idPedido, int idProducto, int cantidad) {
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{CALL sp_insertar_detalle(?, ?, ?)}")) {
+
+            stmt.setInt(1, idPedido);
+            stmt.setInt(2, idProducto);
+            stmt.setInt(3, cantidad);
+
+            stmt.execute();
+            return true;
+
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error al insertar detalle: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+    }
+}
+
+// --------------------------------------------------------
+
+class DetallePedidoScreen extends JDialog {
+    private JTable tableDetalle;
+    private DefaultTableModel detalleModel;
+    private String user;
+    private String password;
+    private int idPedido;
+
+    public DetallePedidoScreen(JFrame parent, String user, String password, int idPedido) {
+        super(parent, "Detalle Pedido", true);
+        this.user = user;
+        this.password = password;
+        this.idPedido = idPedido;
+
+        setLayout(new BorderLayout());
+        setSize(500, 400);
+        setLocationRelativeTo(parent);
+
+        detalleModel = new DefaultTableModel(new String[]{"ID", "Item", "Cantidad"}, 0);
+        tableDetalle = new JTable(detalleModel);
+
+        cargarDetallePedido();
+
+        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton editarItemButton = new JButton("Editar Item");
+        JButton borrarItemButton = new JButton("Borrar Item");
+        JButton cerrarButton = new JButton("Cerrar");
+
+        editarItemButton.setEnabled(false);
+        borrarItemButton.setEnabled(false);
+
+        bottomPanel.add(editarItemButton);
+        bottomPanel.add(borrarItemButton);
+        bottomPanel.add(cerrarButton);
+
+        tableDetalle.getSelectionModel().addListSelectionListener(e -> {
+            boolean algoSeleccionado = tableDetalle.getSelectedRow() != -1;
+            editarItemButton.setEnabled(algoSeleccionado);
+            borrarItemButton.setEnabled(algoSeleccionado);
+        });
+
+        editarItemButton.addActionListener(e -> editarItem());
+        borrarItemButton.addActionListener(e -> borrarItem());
+        cerrarButton.addActionListener(e -> dispose());
+
+        add(new JScrollPane(tableDetalle), BorderLayout.CENTER);
+        add(bottomPanel, BorderLayout.SOUTH);
+
+        setVisible(true);
+    }
+
+    private void cargarDetallePedido() {
+        detalleModel.setRowCount(0);
+
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{call sp_ver_detalle(?)}")) {
+
+            stmt.setInt(1, idPedido);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                int id = rs.getInt("det_ped_id");
+                String item = rs.getString("ite_nom");
+                int cantidad = rs.getInt("det_cant");
+                detalleModel.addRow(new Object[]{id, item, cantidad});
+            }
+
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error al cargar detalle: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void editarItem() {
+        int selectedRow = tableDetalle.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Selecciona un item primero.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        String nombreItem = (String) detalleModel.getValueAt(selectedRow, 1);
+        int nuevaCantidad = capturarNuevaCantidad();
+        if (nuevaCantidad == -1) {
+            return;
+        }
+
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "¿Seguro que deseas actualizar este item con cantidad " + nuevaCantidad + "?",
+                "Confirmar",
+                JOptionPane.YES_NO_OPTION);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            int idItem = obtenerIdItemDesdeNombre(nombreItem);
+            if (idItem == -1) {
+                JOptionPane.showMessageDialog(this, "Error: No se encontró el ID del item.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            actualizarDetallePedido(idPedido, idItem, nuevaCantidad);
+            cargarDetallePedido();
+        }
+    }
+
+    private void borrarItem() {
+        int selectedRow = tableDetalle.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Selecciona un item primero.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        String nombreItem = (String) detalleModel.getValueAt(selectedRow, 1);
+
+        int confirm = JOptionPane.showConfirmDialog(this,
+                "¿Seguro que deseas borrar este item (" + nombreItem + ")?",
+                "Confirmar Borrado",
+                JOptionPane.YES_NO_OPTION);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            int idItem = obtenerIdItemDesdeNombre(nombreItem);
+            if (idItem == -1) {
+                JOptionPane.showMessageDialog(this, "Error: No se encontró el ID del item.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            ejecutarBorradoDetalle(idPedido, idItem);
+            cargarDetallePedido();
+        }
+    }
+
+    private int capturarNuevaCantidad() {
+        JTextField cantidadField = new JTextField();
+
+        Object[] message = {
+                "Nueva Cantidad:", cantidadField
+        };
+
+        int option = JOptionPane.showConfirmDialog(this, message, "Editar Cantidad", JOptionPane.OK_CANCEL_OPTION);
+
+        if (option != JOptionPane.OK_OPTION) {
+            return -1;
+        }
+
+        try {
+            int cantidad = Integer.parseInt(cantidadField.getText().trim());
+            if (cantidad < 1) {
+                JOptionPane.showMessageDialog(this, "La cantidad debe ser mayor a cero.", "Error", JOptionPane.ERROR_MESSAGE);
+                return capturarNuevaCantidad();
+            }
+            return cantidad;
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Por favor ingresa un número válido.", "Error", JOptionPane.ERROR_MESSAGE);
+            return capturarNuevaCantidad();
+        }
+    }
+
+    private int obtenerIdItemDesdeNombre(String nombreItem) {
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             PreparedStatement stmt = conn.prepareStatement("SELECT fn_buscar_id_item(?)")) {
+
+            stmt.setString(1, nombreItem);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return rs.getInt(1);
+            } else {
+                return -1;
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error al obtener id del item: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            return -1;
+        }
+    }
+
+    private void actualizarDetallePedido(int idPedido, int idItem, int cantidad) {
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{call sp_actualizar_detalle(?, ?, ?)}")) {
+
+            stmt.setInt(1, idPedido);
+            stmt.setInt(2, idItem);
+            stmt.setInt(3, cantidad);
+
+            stmt.execute();
+
+            JOptionPane.showMessageDialog(this, "Detalle actualizado correctamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error al actualizar el detalle: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void ejecutarBorradoDetalle(int idPedido, int idItem) {
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{call sp_borrar_detalle(?, ?)}")) {
+
+            stmt.setInt(1, idPedido);
+            stmt.setInt(2, idItem);
+
+            stmt.execute();
+
+            JOptionPane.showMessageDialog(this, "Item borrado correctamente.", "Éxito", JOptionPane.INFORMATION_MESSAGE);
+
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error al borrar el item: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+}
+
+// --------------------------------------------------------
+
+class RegistroClienteScreen extends JDialog {
+    private JTextField txtNombre;
+    private JTextField txtApellido;
+    private JTextField txtEmail;
+    private JTextField txtTelefono;
+    private JButton btnAgregar;
+    private JButton btnCancelar;
+
+    private String user;
+    private String password;
+    private long idCliente;   // Lo recibimos desde la pantalla anterior
+
+    public RegistroClienteScreen(JFrame parent, String user, String password, long idCliente) {
+        super(parent, "Registrar Nuevo Cliente", true);
+
+        this.user = user;
+        this.password = password;
+        this.idCliente = idCliente;
+
+        setLayout(new GridLayout(6, 2, 10, 10));
+
+        add(new JLabel("ID Cliente:"));
+        JTextField txtIdCliente = new JTextField(String.valueOf(idCliente));
+        txtIdCliente.setEnabled(false);
+        add(txtIdCliente);
+
+        add(new JLabel("Nombre:"));
+        txtNombre = new JTextField();
+        add(txtNombre);
+
+        add(new JLabel("Apellido:"));
+        txtApellido = new JTextField();
+        add(txtApellido);
+
+        add(new JLabel("Email (Opcional):"));
+        txtEmail = new JTextField();
+        add(txtEmail);
+
+        add(new JLabel("Teléfono:"));
+        txtTelefono = new JTextField();
+        add(txtTelefono);
+
+        btnAgregar = new JButton("Agregar Cliente");
+        btnCancelar = new JButton("Cancelar");
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.add(btnAgregar);
+        buttonPanel.add(btnCancelar);
+
+        add(buttonPanel);
+
+        btnAgregar.addActionListener(e -> agregarCliente());
+        btnCancelar.addActionListener(e -> dispose());
+
+        setSize(400, 300);
+        setLocationRelativeTo(parent);
+    }
+
+    private void agregarCliente() {
+        String nombre = txtNombre.getText().trim();
+        String apellido = txtApellido.getText().trim();
+        String email = txtEmail.getText().trim();
+        String telefonoStr = txtTelefono.getText().trim();
+
+        if (nombre.isEmpty() || apellido.isEmpty() || telefonoStr.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Todos los campos son obligatorios excepto el email.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        if (telefonoStr.length() < 10) {
+            JOptionPane.showMessageDialog(this, "Longitud de teléfono no válida.", "Advertencia", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        long telefono;
+        try {
+            telefono = Long.parseLong(telefonoStr);
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "El teléfono debe ser un número válido.", "Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        if (insertarClienteEnBD(nombre, apellido, email, telefono)) {
+            JOptionPane.showMessageDialog(this, "Cliente registrado correctamente.");
+            dispose(); // Cierra esta ventana
+            // Aquí es donde, en el futuro, regresamos al flujo de pedido
+        }
+    }
+
+    private boolean insertarClienteEnBD(String nombre, String apellido, String email, long telefono) {
+        try (Connection conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/proyecto", user, password);
+             CallableStatement stmt = conn.prepareCall("{CALL sp_insertar_cliente(?, ?, ?, ?, ?)}")) {
+
+            stmt.setLong(1, idCliente);
+            stmt.setString(2, nombre);
+            stmt.setString(3, apellido);
+            stmt.setString(4, email.isEmpty() ? null : email);
+            stmt.setLong(5, telefono);
+
+            stmt.execute();
+
+            return true;
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error al registrar el cliente: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
+    }
+}
+
+// --------------------------------------------------------
+
+class MesaDialog extends JDialog {
+    private int numeroMesa = -1;
+    private boolean confirmado = false;
+
+    public MesaDialog(JFrame parent) {
+        super(parent, "Ingresar Número de Mesa", true);
+        setLayout(new GridLayout(3, 1));
+
+        JLabel label = new JLabel("Número de mesa:");
+        JTextField txtMesa = new JTextField();
+        JButton confirmar = new JButton("Confirmar");
+        JButton cancelar = new JButton("Cancelar");
+
+        add(label);
+        add(txtMesa);
+
+        JPanel botones = new JPanel();
+        botones.add(confirmar);
+        botones.add(cancelar);
+        add(botones);
+
+        confirmar.addActionListener(e -> {
+            try {
+                numeroMesa = Integer.parseInt(txtMesa.getText().trim());
+                confirmado = true;
+                dispose();
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Número de mesa inválido.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        cancelar.addActionListener(e -> dispose());
+
+        pack();
+        setLocationRelativeTo(parent);
+    }
+
+    public int getNumeroMesa() {
+        return numeroMesa;
+    }
+
+    public boolean isConfirmado() {
+        return confirmado;
+    }
+}
